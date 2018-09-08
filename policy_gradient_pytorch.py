@@ -14,27 +14,39 @@ from torch.distributions import Categorical
 
 
 parser = argparse.ArgumentParser(description='PyTorch REINFORCE example')
-parser.add_argument('--gamma', type=float, default=0.99, metavar='G',
-                    help='discount factor (default: 0.99)')
-parser.add_argument('--seed', type=int, default=543, metavar='N',
-                    help='random seed (default: 543)')
-parser.add_argument('--render', action='store_true',
-                    help='render the environment')
-parser.add_argument('--log-interval', type=int, default=10, metavar='N',
-                    help='interval between training status logs (default: 10)')
+# parser.add_argument('--gamma', type=float, default=0.99, metavar='G',
+#                     help='discount factor (default: 0.99)')
+# parser.add_argument('--seed', type=int, default=543, metavar='N',
+#                     help='random seed (default: 543)')
+# parser.add_argument('--render', action='store_true',
+#                     help='render the environment')
+# parser.add_argument('--log-interval', type=int, default=10, metavar='N',
+#                     help='interval between training status logs (default: 10)')
 args = parser.parse_args()
 
 
-env = gym.make('CartPole-v0')
-env.seed(args.seed)
-torch.manual_seed(args.seed)
+# env = gym.make('CartPole-v0')
+# LR = 0.01
+# GAMMA = 0.99
 
+env = gym.make('MountainCar-v0')
+LR = 0.05
+GAMMA = 0.99
+
+# env = gym.make('MountainCarContinuous-v0')
+# env = gym.make('Pendulum-v0')
+# env = gym.make('Acrobot-v1')
+
+# env.seed(args.seed)
+# torch.manual_seed(args.seed)
+N_ACTIONS = env.action_space.n
+N_STATES = env.observation_space.shape[0]
 
 class Policy(nn.Module):
     def __init__(self):
         super(Policy, self).__init__()
-        self.affine1 = nn.Linear(4, 128)
-        self.affine2 = nn.Linear(128, 2)
+        self.affine1 = nn.Linear(N_STATES, 128)
+        self.affine2 = nn.Linear(128, N_ACTIONS)
 
         self.saved_log_probs = []
         self.rewards = []
@@ -46,7 +58,7 @@ class Policy(nn.Module):
 
 
 policy = Policy()
-optimizer = optim.Adam(policy.parameters(), lr=1e-2)
+optimizer = optim.Adam(policy.parameters(), lr=LR)
 eps = np.finfo(np.float32).eps.item()
 
 
@@ -64,7 +76,7 @@ def finish_episode():
     policy_loss = []
     rewards = []
     for r in policy.rewards[::-1]:
-        R = r + args.gamma * R
+        R = r + GAMMA * R
         rewards.insert(0, R)
     rewards = torch.tensor(rewards)
     rewards = (rewards - rewards.mean()) / (rewards.std() + eps)
@@ -79,27 +91,30 @@ def finish_episode():
 
 
 def main():
-    running_reward = 10
-    for i_episode in count(1):
+    running_reward = 0
+    for i_episode in range(10000):
         state = env.reset()
+        episode_reward = 0
         for t in range(10000):  # Don't infinite loop while learning
             action = select_action(state)
             state, reward, done, _ = env.step(action)
-            if args.render:
-                env.render()
+            # if args.render:
+            env.render()
             policy.rewards.append(reward)
+            episode_reward += reward
             if done:
                 break
 
         running_reward = running_reward * 0.99 + t * 0.01
         finish_episode()
-        if i_episode % args.log_interval == 0:
-            print('Episode {}\tLast length: {:5d}\tAverage length: {:.2f}'.format(
-                i_episode, t, running_reward))
-        if running_reward > env.spec.reward_threshold:
-            print("Solved! Running reward is now {} and "
-                  "the last episode runs to {} time steps!".format(running_reward, t))
-            break
+        # if i_episode % args.log_interval == 0:
+        running_reward = running_reward * 0.99 + episode_reward * 0.01
+        print('Episode {}\treward: {:.2f}\tAverage reward: {:.2f}'.format(
+            i_episode, episode_reward, running_reward))
+        # if running_reward > env.spec.reward_threshold:
+        #     print("Solved! Running reward is now {} and "
+        #           "the last episode runs to {} time steps!".format(running_reward, t))
+        #     break
 
 
 if __name__ == '__main__':
