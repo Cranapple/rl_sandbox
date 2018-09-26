@@ -283,6 +283,7 @@ def main():
         if update_i % SAVE_INTERVAL == 0:
             save_model = policy
             torch.save(save_model, os.path.join(MODEL_DIR, 'model_%i.pt' % update_i))
+    writer.close()
 
 if __name__ == '__main__':
     main()
